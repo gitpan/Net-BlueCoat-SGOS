@@ -1,5 +1,11 @@
 Revision history for Net-BlueCoat-SGOS
 
-0.01    Date/time
+0.45    04-29-2010 0347
         First version, released on an unsuspecting world.
+
+0.46	04-29-2010 0404
+		Minor changes
+
+0.47	04-29-2010 0424
+		Code cleanup
 

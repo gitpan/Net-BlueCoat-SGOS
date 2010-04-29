@@ -26,11 +26,11 @@ Net::BlueCoat::SGOS - A module to interact with Blue Coat SGOS-based devices.
 
 =head1 VERSION
 
-Version 0.45
+Version 0.46
 
 =cut
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 =head1 SYNOPSIS
 
@@ -442,8 +442,6 @@ sub _parse_sysinfo {
 		# sgos5, ip address and subnet mask are on SAME line
 		if ($line =~ m/ip-address/) {
 
-			# ip-address 10.22.206.5 255.255.255.0
-			#($ip, $netmask) = $line =~ m/^ip-address (.{1,3}\..{1,3}\..{1,3}\..{1,3}) *(.{1,3}\..{1,3}\..{1,3}\..{1,3})?/i;
 			($ip, $netmask) =
 			  $line  =~ m/^ip-address *(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})*/i;
 			$ip      =~ s/\s+//gi;
@@ -627,10 +625,6 @@ sub _parse_route_table {
 	if ($self->{'sgos_sysinfo_sect'}{'TCP/IP Routing Table'}) {
 		$self->{'routetable'} = $self->{'sgos_sysinfo_sect'}{'TCP/IP Routing Table'};
 	}
-
-	#elsif ( $self->{'sgos_swconfig_section'}{'networking'} ) {
-	#	@r = split(/\n/, $self->{'sgos_swconfig'}{'networking'});
-	#}
 	else {
 		@r = split(/\n/, $self->{'sgos_sysinfo_sect'}{'Software Configuration'});
 	}
@@ -649,9 +643,6 @@ m/\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})
 			  ) {
 				$self->{'static-route-table'} = $self->{'static-route-table'} . $line . "\n";
 			}
-
-			#161.85.126.0     255.255.255.0    130.138.227.62
-			#
 		}
 	}
 
