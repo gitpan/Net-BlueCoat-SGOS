@@ -1,0 +1,54 @@
+Net-BlueCoat-SGOS
+
+This is the Net::BlueCoat::SGOS module.  It seeks to parse
+the configuation of a Blue Coat SGOS device.
+
+
+** WARNING 
+This is currently alpha-quality software.  This means:
++ there could be bugs
++ the API is not stable
+
+It has been tested on a handful of sysinfo files with great
+success.
+
+
+INSTALLATION
+
+To install this module, run the following commands:
+
+	perl Makefile.PL
+	make
+	make test
+	make install
+
+SUPPORT AND DOCUMENTATION
+
+After installing, you can find documentation for this module with the
+perldoc command.
+
+    perldoc Net::BlueCoat::SGOS
+
+You can also look for information at:
+
+    RT, CPAN's request tracker
+        http://rt.cpan.org/NoAuth/Bugs.html?Dist=Net-BlueCoat-SGOS
+
+    AnnoCPAN, Annotated CPAN documentation
+        http://annocpan.org/dist/Net-BlueCoat-SGOS
+
+    CPAN Ratings
+        http://cpanratings.perl.org/d/Net-BlueCoat-SGOS
+
+    Search CPAN
+        http://search.cpan.org/dist/Net-BlueCoat-SGOS/
+
+
+LICENSE AND COPYRIGHT
+
+Copyright (C) 2008-2010 Matthew Lange
+
+This program is free software; you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published
+by the Free Software Foundation.
+

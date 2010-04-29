@@ -1,0 +1,12 @@
+Changes
+MANIFEST
+Makefile.PL
+README
+examples/healthcheck.pl
+lib/Net/BlueCoat/SGOS.pm
+t/000_load.t
+t/010_author_tests.t
+t/030_file_sysinfo.t
+t/sysinfos/5.3.1.4.sysinfo
+t/sysinfos/public.parameters
+META.yml                                 Module meta-data (added by MakeMaker)
