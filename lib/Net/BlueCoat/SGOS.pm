@@ -26,11 +26,11 @@ Net::BlueCoat::SGOS - A module to interact with Blue Coat SGOS-based devices.
 
 =head1 VERSION
 
-Version 0.44
+Version 0.45
 
 =cut
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 =head1 SYNOPSIS
 
@@ -622,7 +622,6 @@ sub _parse_route_table {
 	#inline static-route-table "end-398382495-inline"
 	#; IP-Address Subnet Mask Gateway
 	#172.16.0.0 255.240.0.0 172.20.144.1
-	#157.231.0.0 255.255.0.0 172.20.144.1
 	#end-398382495-inline
 	my @r;
 	if ($self->{'sgos_sysinfo_sect'}{'TCP/IP Routing Table'}) {

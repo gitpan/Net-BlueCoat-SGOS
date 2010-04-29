@@ -13,7 +13,7 @@ WriteMakefile(
     PL_FILES            => {},
     PREREQ_PM => {
         'Test::More' => 0,
-		'LWP::UserAgent'       => 5.8.3.1,
+		'LWP::UserAgent'       => '5.8.3.1',
 		'LWP::Protocol::https' => 0,
 		'Readonly'             => 1.03,
     },

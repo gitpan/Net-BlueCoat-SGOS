@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Net-BlueCoat-SGOS
-version:            0.44
+version:            0.45
 abstract:           A module to interact with Blue Coat SGOS-based devices.
 author:
     - Matthew Lange <mmlange@cpan.org>
@@ -12,7 +12,7 @@ build_requires:
     ExtUtils::MakeMaker:  0
 requires:
     LWP::Protocol::https:  0
-    LWP::UserAgent:       
+    LWP::UserAgent:       5.8.3.1
     Readonly:             1.03
     Test::More:           0
 no_index:
