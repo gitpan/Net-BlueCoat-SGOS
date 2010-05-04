@@ -3,7 +3,6 @@ use strict;
 no warnings;
 use Data::Dumper;
 use LWP::UserAgent;
-use Readonly;
 
 our %_URL = (
 	'archconf_expanded'    => '/archconf_expanded.txt',
@@ -26,11 +25,11 @@ Net::BlueCoat::SGOS - A module to interact with Blue Coat SGOS-based devices.
 
 =head1 VERSION
 
-Version 0.46
+Version 0.90
 
 =cut
 
-our $VERSION = '0.46';
+our $VERSION = '0.90';
 
 =head1 SYNOPSIS
 
@@ -50,7 +49,7 @@ device.
 	$bc->login();
 	# or
 	# my $bc = Net::BlueCoat::SGOS->new();
-	# $bc->get_sysinfo_from_file('path/to/file.sysinfo');
+	# $bc->get_sysinfo_from_file('/path/to/file.sysinfo');
 
 	my $sgosversion = $bc->{'sgosversion'};
 	my $sgosreleaseid = $bc->{'sgosreleaseid'};
@@ -61,7 +60,7 @@ device.
 	# Hardware section of the sysinfo file
 	my $hwinfo = $bc->{'sgos_sysinfo_sect'}{'Hardware Information'};
 
-	# Software configuration (e.g. show configuration)
+	# Software configuration (i.e. show configuration)
 	my $swconfig = $bc->{'sgos_sysinfo_sect'}{'Software Configuration'};
 
 
@@ -185,6 +184,8 @@ sub login {
 
 Takes one parameter: the filename of a sysinfo file on the disk.  Use this
 instead of logging in over the network.
+
+	$bc->get_sysinfo_from_file('sysinfo.filename.here');
 
 =cut
 
@@ -344,6 +345,14 @@ sub _parse_sysinfo {
 	# Model: 200-B
 	($self->{'modelnumber'}) = $self->{'sgos_sysinfo_sect'}{'Hardware Information'} =~ m/Model:\s(.+)/im;
 
+	if ($self->{'sgos_sysinfo_sect'}{'Software Configuration'}) {
+		my $r = $self->_parse_swconfig;
+	}
+	else {
+		# e.g. probably a sysinfo-snapshot
+		return undef;
+	}
+	
 	# Find appliance-name
 	# located in the Software Configuration
 	# looks like:
@@ -351,21 +360,8 @@ sub _parse_sysinfo {
 	# limited to 127 characters
 	# e.g.: % String exceeds allowed length (127)
 	#
-	if ($self->{'sgos_sysinfo_sect'}{'Software Configuration'}) {
-		my $r = $self->_parse_swconfig;
-	}
-	else {
-
-		# e.g. probably a sysinfo-snapshot
-		return undef;
-	}
-	if ($self->{'sgosversion'} =~ m/4\.[12]\.\d\.\d/) {
-		(undef, $self->{'appliance-name'}) =
-		  $self->{'sgos_sysinfo_sect'}{'Software Configuration'} =~ m/(appliance-name|hostname) (.+)$/im;
-	}
-	else {
-		(undef, $self->{'appliance-name'}) = $self->{'sgos_swconfig_section'}{'general'} =~ m/(appliance-name|hostname) (.+)$/im;
-	}
+	(undef, $self->{'appliance-name'}) =
+	$self->{'sgos_sysinfo_sect'}{'Software Configuration'} =~ m/(appliance-name|hostname) (.+)$/im;
 	$self->{'appliance-name'} =~ s/^\"//;
 	$self->{'appliance-name'} =~ s/\"$//;
 
@@ -513,7 +509,6 @@ sub _parse_swconfig {
 
 	# only applies to SGOS >5
 	my $sectionname = '';
-	my $sectionline;
 	foreach (1 .. $#split_swconfig) {
 		my $line = $split_swconfig[$_];
 		chomp $line;
@@ -647,6 +642,40 @@ m/\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})
 	}
 
 }
+
+=head2 Other Data
+
+Other data that is directly accessible in the object:
+
+	Appliance Name:   $bc->{'appliance-name'}
+	Model Number:     $bc->{'modelnumber'}
+	Serial Number:    $bc->{'serialnumber'}
+	SGOS Version:     $bc->{'sgosversion'}
+	Release ID:       $bc->{'sgosreleaseid'}
+	Default Gateway:  $bc->{'ip-default-gateway'}
+
+	The details for interface 0:0 are stored here:
+		IP address:   $bc->{'interface'}{'0:0'}{'ip'} 
+		Netmask:      $bc->{'interface'}{'0:0'}{'netmask'} 
+		MAC address:  $bc->{'interface'}{'0:0'}{'mac'} 
+		Link status:  $bc->{'interface'}{'0:0'}{'linkstatus'} 
+		Capabilities: $bc->{'interface'}{'0:0'}{'capabilities'} 
+
+	You can retrieve the interface names like this:
+		my @interfaces = keys %{$bc->{'interface'}};
+
+	The route table can	be retrieved as follows:
+		$bc->{'sgos_sysinfo_sect'}{'TCP/IP Routing Table'}
+
+	The static route table can be retrieved as follows:
+		$bc->{'static-route-table'}
+
+	The WCCP configuration can be retrieved as follows:
+		$bc->{'sgos_sysinfo_sect'}{'WCCP Configuration'}
+
+
+=cut
+
 
 =head1 AUTHOR
 

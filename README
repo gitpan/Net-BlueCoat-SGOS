@@ -1,7 +1,7 @@
 Net-BlueCoat-SGOS
 
 This is the Net::BlueCoat::SGOS module.  It seeks to parse
-the configuation of a Blue Coat SGOS device.
+the configuration of a Blue Coat SGOS device.
 
 
 ** WARNING 
@@ -42,6 +42,14 @@ You can also look for information at:
 
     Search CPAN
         http://search.cpan.org/dist/Net-BlueCoat-SGOS/
+
+
+TODO
+
+There are many things to do:
+* Stabilize the API
+* Effectively extract the CPL and VPM-XML data
+* Allow interaction with a device over the network
 
 
 LICENSE AND COPYRIGHT
