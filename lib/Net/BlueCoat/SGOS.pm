@@ -25,11 +25,11 @@ Net::BlueCoat::SGOS - A module to interact with Blue Coat SGOS-based devices.
 
 =head1 VERSION
 
-Version 0.90
+Version 0.91
 
 =cut
 
-our $VERSION = '0.90';
+our $VERSION = '0.91';
 
 =head1 SYNOPSIS
 
@@ -310,69 +310,96 @@ sub _parse_sysinfo {
 		$self->{'sgos_sysinfo_sect'}{$sectionname} = $data;
 	}
 
-	# parse  SGOS version, SGOS releaseid, and serial number
-	if ($self->{'_debuglevel'} > 0) {
-		print "VERSION INFO SECTION:\n";
-		print $self->{'sgos_sysinfo_sect'}{'Version Information'} . "\n";
-	}
+	# parse version
+	$self->_parse_sgos_version();
 
-	# SGOS version
-	# #Version Information
-	# URL_Path /SYSINFO/Version
-	# Blue Coat Systems, Inc., ProxySG Appliance Version Information
-	# Version: SGOS 4.2.10.1
-	#
-	($self->{'sgosversion'}) = $self->{'sgos_sysinfo_sect'}{'Version Information'} =~ m/Version:\sSGOS\s(\d+\.\d+\.\d+\.\d+)/im;
-	if ($self->{'_debuglevel'} > 0) {
-		print "SGOS version = $self->{'sgosversion'}\n";
-	}
+	# parse releaseid
+	$self->_parse_sgos_releaseid();
 
-	# SGOS release ID
-	($self->{'sgosreleaseid'}) = $self->{'sgos_sysinfo_sect'}{'Version Information'} =~ m/Release\sid:\s(\d+)/isx;
+	# parse serial number
+	$self->_parse_serial_number();
 
-	# Serial number
-	($self->{'serialnumber'}) = $self->{'sgos_sysinfo_sect'}{'Version Information'} =~ m/Serial\snumber\sis\s(\d+)/isx;
+	# parse sysinfo time
+	$self->_parse_sysinfo_time();
 
-	# sysinfo time
-	# time on this file
-	# The current time is Mon Nov 23, 2009 18:48:38 GMT (SystemTime 438547718)
-	# The current time is Sat Mar 7, 2009 16:57:30 GMT (SystemTime 415990650)
-	#
-	#
-	($self->{'sysinfotime'}) = $self->{'sgos_sysinfo_sect'}{'Version Information'} =~ m/^The current time is (.+) \(/im;
+	# parse model
+	$self->_parse_model_number();
 
-	# model
-	# Model: 200-B
-	($self->{'modelnumber'}) = $self->{'sgos_sysinfo_sect'}{'Hardware Information'} =~ m/Model:\s(.+)/im;
-
+	# parse the configuration
 	if ($self->{'sgos_sysinfo_sect'}{'Software Configuration'}) {
-		my $r = $self->_parse_swconfig;
+		$self->_parse_swconfig;
+		$self->{'sysinfo_type'} = 'sysinfo';
 	}
 	else {
-		# e.g. probably a sysinfo-snapshot
+		$self->{'sysinfo_type'} = 'sysinfo_snapshot';
 		return undef;
 	}
-	
-	# Find appliance-name
-	# located in the Software Configuration
-	# looks like:
-	# appliance-name "ProxySG 210 4609077777"
-	# limited to 127 characters
-	# e.g.: % String exceeds allowed length (127)
-	#
+
+	# parse VPM-CPL and VPM-XML
+	$self->_parse_vpm();
+
+	# parse the static bypass list
+	$self->_parse_static_bypass();
+
+	# parse the appliance name
+	$self->_parse_appliance_name();
+
+	# parse the network information
+	$self->_parse_network();
+
+	# parse the ssl accelerator info
+	$self->_parse_ssl_accelerator();
+
+	# parse the default gateway
+	$self->_parse_default_gateway();
+
+	# parse the route table
+	$self->_parse_route_table();
+
+	return 1;
+}
+
+# Find appliance-name
+# located in the Software Configuration
+# looks like:
+# appliance-name "ProxySG 210 4609077777"
+# limited to 127 characters
+# e.g.: % String exceeds allowed length (127)
+#
+sub _parse_appliance_name {
+	my $self = shift;
+	if ($self->{'_debuglevel'} > 0) {
+		print "_parse_swconfig\n";
+	}
 	(undef, $self->{'appliance-name'}) =
-	$self->{'sgos_sysinfo_sect'}{'Software Configuration'} =~ m/(appliance-name|hostname) (.+)$/im;
-	$self->{'appliance-name'} =~ s/^\"//;
-	$self->{'appliance-name'} =~ s/\"$//;
+	  $self->{'sgos_sysinfo_sect'}{'Software Configuration'} =~ m/(appliance-name|hostname) (.+)$/im;
+	$self->{'appliance-name'}                                =~ s/^\"//;
+	$self->{'appliance-name'}                                =~ s/\"$//;
 
 	if ($self->{'_debuglevel'} > 0) {
 		print "appliancename=$self->{'appliance-name'}\n";
 	}
+}
 
-	# get network
-	# Network:
-	#   Interface 0:0: Bypass 10/100     with no link  (MAC 00:d0:83:04:ae:fc)
-	#   Interface 0:1: Bypass 10/100     running at 100 Mbps full duplex (MAC 00:d0:83:04:ae:fd)
+# model
+# Model: 200-B
+sub _parse_model_number {
+	my $self = shift;
+	if ($self->{'_debuglevel'} > 0) {
+		print "_parse_model_number\n";
+	}
+	($self->{'modelnumber'}) = $self->{'sgos_sysinfo_sect'}{'Hardware Information'} =~ m/Model:\s(.+)/im;
+}
+
+# get network
+# Network:
+#   Interface 0:0: Bypass 10/100     with no link  (MAC 00:d0:83:04:ae:fc)
+#   Interface 0:1: Bypass 10/100     running at 100 Mbps full duplex (MAC 00:d0:83:04:ae:fd)
+sub _parse_network {
+	my $self = shift;
+	if ($self->{'_debuglevel'} > 0) {
+		print "_parse_network\n";
+	}
 	my ($netinfo) = $self->{'sgos_sysinfo_sect'}{'Hardware Information'} =~ m/Network:(.+)Accelerators/ism;
 	my @s = split(/\n/, $netinfo);
 	chomp @s;
@@ -425,78 +452,31 @@ sub _parse_sysinfo {
 	foreach (@t) {
 		my $line = $_;
 
-		#print "line=$line\n";
 		if ($line =~ m/interface (.+)\;/i) {
-
-			#print "line has interface in it, line=$line\n";
 			($interface) = $line =~ m/^interface (\d+\:?\d*\.*\d*)/i;
-
-			#print "found an interface, it is=$interface=\n";
 		}
 
 		# sgos4, ip address and subnet mask are on separate lines
 		# sgos5, ip address and subnet mask are on SAME line
 		if ($line =~ m/ip-address/) {
 
-			($ip, $netmask) =
-			  $line  =~ m/^ip-address *(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})*/i;
+			($ip, $netmask) = $line =~ m/^ip-address *(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}) *(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})*/i;
 			$ip      =~ s/\s+//gi;
 			$netmask =~ s/\s+//gi;
-
-			#print "MATCHED ip=$ip, netmask=$netmask\n";
 		}
 		if ($line =~ m/subnet-mask/) {
-
-			#print "line has subnet-mask in it, line=$line\n";
-			#($netmask) = $line =~ m/^subnet-mask (.{1,3}\..{1,3}\..{1,3}\..{1,3})/i;
 			($netmask) = $line =~ m/^subnet-mask *(.{1,3}\..{1,3}\..{1,3}\..{1,3})/i;
 			$netmask =~ s/\s+//gi;
-
-			#print "matched netmask=$netmask\n";
 		}
 
 		if (length($interface) > 1 && $ip && $netmask) {
-
-			#print "===Got interface and ip and netmask...\n";
-			#print "interface=$interface, ip=$ip, netmask=$netmask\n";
 			$self->{'interface'}{$interface}{'ip'}      = $ip;
 			$self->{'interface'}{$interface}{'netmask'} = $netmask;
 			$interface                                  = undef;
 			$ip                                         = undef;
 		}
 
-		#print "pm: interface 0:0 netmask = $self->{'interface'}{$interface}{'netmask'}\n";
-
 	}
-
-	# SSL Accelerators
-	# looks like:
-	# Accelerators: none
-	# or
-	# Accelerators:
-	#  Internal: Cavium CN1010 Security Processor
-	#  Internal: Cavium CN501 Security Processor
-	#  Internal: Broadcom 5825 Security Processor
-	#
-	my ($acceleratorinfo) = $self->{'sgos_sysinfo_sect'}{'Hardware Information'} =~ m/(Accelerators\:.+)/ism;
-	my @a = split(/\n/, $acceleratorinfo);
-
-	#print "There are $#a lines\n";
-	# if 1 line, then no SSL accelerator
-	if ($#a == 0) {
-		$self->{'ssl-accelerator'} = 'none';
-	}
-	if ($#a > 0) {
-		($self->{'ssl-accelerator'}) = $a[1] =~ m/\s+(.+)/;
-	}
-
-	#	print "DEBUG: acceleratorinfo=$acceleratorinfo\n";
-	#print "DEBUG: ssl-accelerator=$self->{'ssl-accelerator'}\n";
-
-	my $r = $self->_parse_default_gateway();
-	$r = $self->_parse_route_table();
-
-	return 1;
 }
 
 sub _parse_swconfig {
@@ -514,79 +494,98 @@ sub _parse_swconfig {
 		chomp $line;
 		if ($line =~ m/!- BEGIN/) {
 			($sectionname) = $line =~ m/!- BEGIN (.+)/;
-
-			#print "sectionname begin=$sectionname\n";
 		}
 		elsif ($line =~ m/!- END/) {
-
-			#			print "sectionname end=$sectionname\n";
 			next;
 		}
 		else {
 			$self->{'sgos_swconfig_section'}{$sectionname} = $self->{'sgos_swconfig_section'}{$sectionname} . $line . "\n";
-
 		}
 
 	}
 
-	# on a 5.3.1.4 box:
-	#inline policy vpm-cpl end-415990651-inline
-	#inline policy vpm-xml end-415990651-inline
+}
 
-	# policy display varies per SGOS version
-	if ($self->{'sgosversion'} =~ m/5.3.1.4/) {
-		my ($endmarker) = $self->{'sgos_swconfig_section'}{'policy'} =~ m/inline\spolicy\svpm-cpl\send-(\d+)-inline/isx;
+sub _parse_static_bypass {
+	my $self = shift;
+	my @lines = split(/\n/, $self->{'sgos_sysinfo_sect'}{'Software Configuration'});
+	my $have_static_bypass;
+	foreach my $line (@lines) {
+		if ($line =~ m/static-bypass/) {
+			$have_static_bypass = 1;
+		}
+		elsif ($have_static_bypass) {
+			if ($line =~ m/exit/) {
+				last;
+			}
+			else {
+				$line =~ s/^add //i;
+				$self->{'static-bypass'} = $self->{'static-bypass'} . $line . "\n";
+			}
+		}
+	}
+}
 
-		#print "ENDMARKER=$endmarker\n";
-		($self->{'cpl'}) =
-		  $self->{'sgos_swconfig_section'}{'policy'} =~
-		  m/inline\spolicy\svpm-cpl\send-$endmarker-inline(.+)end-$endmarker-inline\ninline\spolicy\svpm-xml/isx;
-		($self->{'vpm-xml'}) =
-		  $self->{'sgos_swconfig_section'}{'policy'} =~
-		  m/\ninline\spolicy\svpm-xml\send-$endmarker-inline\n(.+)end-$endmarker-inline/isx;
+sub _parse_vpm {
+	my $self = shift;
+	my @lines = split(/\n/, $self->{'sgos_sysinfo_sect'}{'Software Configuration'});
+	my $have_vpm_cpl;
+	my $have_vpm_xml;
 
-		#print "CPL=" . $self->{'cpl'} . "\n";
-		#print "ENDCPL\n";
-		#print "xml=$self->{'vpm-xml'}\n";
-		#print "endxml\n";
+	foreach my $line (@lines) {
+		if ($line =~ m/^inline policy vpm-cpl \"*end-(\d+)-inline\"*/) {
+			($have_vpm_cpl) = $line =~ m/^inline policy vpm-cpl \"*end-(\d+)-inline\"*/;
+		}
+		elsif ($have_vpm_cpl) {
+			if ($line =~ m/end-$have_vpm_cpl-inline/i) {
+				last;
+			}
+			else {
+				$self->{'vpm-cpl'} = $self->{'vpm-cpl'} . $line . "\n";
+			}
+		}
+
 	}
 
-	# get vpm
-	# inline policy vpm
-	#inline policy vpm end-451370228-inline end-451370228-inline-xmlA
-	# cpl
-	#end-451370228-inline
-	# xml
-	#end-451370228-inline-xml
-	if ($self->{'sgosversion'} =~ m/5.4.\d.\d/) {
-		my ($endmarker) = $self->{'sgos_swconfig_section'}{'policy'} =~ m/inline\spolicy\svpm\send-(\d+)-inline/isx;
+	foreach my $line (@lines) {
+		if ($line =~ m/^inline policy vpm-xml \"*end-(\d+)-inline\"*/) {
+			($have_vpm_xml) = $line =~ m/^inline policy vpm-xml \"*end-(\d+)-inline\"*/;
+		}
+		elsif ($have_vpm_xml) {
+			if ($line =~ m/end-$have_vpm_xml-inline/i) {
+				last;
+			}
+			else {
+				$self->{'vpm-xml'} = $self->{'vpm-xml'} . $line . "\n";
+			}
+		}
 
-		#print "ENDMARKER=$endmarker\n";
-		($self->{'cpl'}) =
-		  $self->{'sgos_swconfig_section'}{'policy'} =~
-		  m/inline\spolicy\svpm\send-$endmarker-inline\send-$endmarker-inline-xml(.+)end-$endmarker-inline\n/isx;
-		($self->{'vpm-xml'}) =
-		  $self->{'sgos_swconfig_section'}{'policy'} =~ m/\nend-$endmarker-inline\n(.+)end-$endmarker-inline-xml/isx;
-
-		#print "CPL=" . $self->{'cpl'} . "\n";
-		#print "ENDCPL\n";
-		#print "xml=$self->{'vpm-xml'}\n";
-		#print "endxml\n";
 	}
 
-	# 4.x
-	if ($self->{'sgosversion'} =~ m/4\.2\.\d\.\d/) {
-		my ($endmarker) =
-		  $self->{'sgos_sysinfo_sect'}{'Software Configuration'} =~ m/inline\spolicy\svpm-cpl\s\"end-(\d+)-inline\"/isx;
-		($self->{'cpl'}) =
-		  $self->{'sgos_sysinfo_sect'}{'Software Configuration'} =~
-		  m/inline\spolicy\svpm-cpl\s\"end-$endmarker-inline\"(.+)end-$endmarker-inline\n/isx;
+	return 1 if ($self->{'vpm-cpl'} && $self->{'vpm-xml'});
+}
 
-		($self->{'vpm-xml'}) =
-		  $self->{'sgos_sysinfo_sect'}{'Software Configuration'} =~
-		  m/inline\spolicy\svpm-xml\s\"end-$endmarker-inline\"(.+)end-$endmarker-inline\n/isx;
-	}
+=head2 vpmcpl
 
+Displays the VPM-CPL data.  Note that this does not currently return the
+local, central, or forwarding policies.
+
+=cut
+
+sub vpmcpl {
+	my $self = shift;
+	return $self->{'vpm-cpl'};
+}
+
+=head2 vpmxml
+
+Displays the VPM-XML data.
+
+=cut
+
+sub vpmxml {
+	my $self = shift;
+	return $self->{'vpm-xml'};
 }
 
 sub _parse_default_gateway {
@@ -643,6 +642,92 @@ m/\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s*(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})
 
 }
 
+sub _parse_serial_number {
+	my $self = shift;
+	if ($self->{'_debuglevel'} > 0) {
+		print "_parse_sgos_serial_number\n";
+	}
+	($self->{'serialnumber'}) = $self->{'sgos_sysinfo_sect'}{'Version Information'} =~ m/Serial\snumber\sis\s(\d+)/isx;
+}
+
+sub _parse_ssl_accelerator {
+	my $self = shift;
+	if ($self->{'_debuglevel'} > 0) {
+		print "_parse_ssl_accelerator\n";
+	}
+
+	# SSL Accelerators
+	# looks like:
+	# Accelerators: none
+	# or
+	# Accelerators:
+	#  Internal: Cavium CN1010 Security Processor
+	#  Internal: Cavium CN501 Security Processor
+	#  Internal: Broadcom 5825 Security Processor
+	#
+	my ($acceleratorinfo) = $self->{'sgos_sysinfo_sect'}{'Hardware Information'} =~ m/(Accelerators\:.+)/ism;
+	my @a = split(/\n/, $acceleratorinfo);
+
+	#print "There are $#a lines\n";
+	# if 1 line, then no SSL accelerator
+	if ($#a == 0) {
+		$self->{'ssl-accelerator'} = 'none';
+	}
+	if ($#a > 0) {
+		($self->{'ssl-accelerator'}) = $a[1] =~ m/\s+(.+)/;
+	}
+
+	#	print "DEBUG: acceleratorinfo=$acceleratorinfo\n";
+	#print "DEBUG: ssl-accelerator=$self->{'ssl-accelerator'}\n";
+}
+
+# sysinfo time
+# time on this file
+# The current time is Mon Nov 23, 2009 18:48:38 GMT (SystemTime 438547718)
+# The current time is Sat Mar 7, 2009 16:57:30 GMT (SystemTime 415990650)
+sub _parse_sysinfo_time {
+	my $self = shift;
+	if ($self->{'_debuglevel'} > 0) {
+		print "_parse_sysinfo_time\n";
+	}
+	($self->{'sysinfotime'}) = $self->{'sgos_sysinfo_sect'}{'Version Information'} =~ m/^The current time is (.+) \(/im;
+}
+
+sub _parse_sgos_releaseid {
+	my $self = shift;
+	if ($self->{'_debuglevel'} > 0) {
+		print "_parse_sgos_releaseid\n";
+	}
+
+	# parse  SGOS version, SGOS releaseid, and serial number
+	# SGOS release ID
+	($self->{'sgosreleaseid'}) = $self->{'sgos_sysinfo_sect'}{'Version Information'} =~ m/Release\sid:\s(\d+)/isx;
+}
+
+sub _parse_sgos_version {
+	my $self = shift;
+	if ($self->{'_debuglevel'} > 0) {
+		print "_parse_sgos_version\n";
+	}
+
+	# parse  SGOS version, SGOS releaseid, and serial number
+	if ($self->{'_debuglevel'} > 0) {
+		print "VERSION INFO SECTION:\n";
+		print $self->{'sgos_sysinfo_sect'}{'Version Information'} . "\n";
+	}
+
+	# SGOS version
+	# #Version Information
+	# URL_Path /SYSINFO/Version
+	# Blue Coat Systems, Inc., ProxySG Appliance Version Information
+	# Version: SGOS 4.2.10.1
+	#
+	($self->{'sgosversion'}) = $self->{'sgos_sysinfo_sect'}{'Version Information'} =~ m/Version:\sSGOS\s(\d+\.\d+\.\d+\.\d+)/im;
+	if ($self->{'_debuglevel'} > 0) {
+		print "SGOS version = $self->{'sgosversion'}\n";
+	}
+}
+
 =head2 Other Data
 
 Other data that is directly accessible in the object:
@@ -653,6 +738,114 @@ Other data that is directly accessible in the object:
 	SGOS Version:     $bc->{'sgosversion'}
 	Release ID:       $bc->{'sgosreleaseid'}
 	Default Gateway:  $bc->{'ip-default-gateway'}
+	Sysinfo Time:     $bc->{'sysinfotime'}
+	Accelerator Info: $bc->{'ssl-accelerator'}
+
+	The software configuration can be retrieved as follows:
+		$bc->{'sgos_sysinfo_sect'}{'Software Configuration'}
+
+	Other sections that can be retrieved:
+		$bc->{'sgos_sysinfo_sect'}{'Software Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'ADN Compression Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'ADN Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'ADN Node Info'}
+		$bc->{'sgos_sysinfo_sect'}{'ADN Sizing Peers'}
+		$bc->{'sgos_sysinfo_sect'}{'ADN Sizing Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'ADN Tunnel Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'AOL IM Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Access Log Objects'}
+		$bc->{'sgos_sysinfo_sect'}{'Access Log Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Authenticator Memory Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Authenticator Realm Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Authenticator Total Realm Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'CCM Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'CCM Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'CIFS Memory Usage'}
+		$bc->{'sgos_sysinfo_sect'}{'CIFS Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'CPU Monitor'}
+		$bc->{'sgos_sysinfo_sect'}{'CacheEngine Main'}
+		$bc->{'sgos_sysinfo_sect'}{'Configuration Change Events'}
+		$bc->{'sgos_sysinfo_sect'}{'Content Filter Status'}
+		$bc->{'sgos_sysinfo_sect'}{'Core Image'}
+		$bc->{'sgos_sysinfo_sect'}{'Crypto Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'DNS Cache Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'DNS Query Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Disk 1'}
+		... and up to Disk 10, in some cases
+		$bc->{'sgos_sysinfo_sect'}{'Endpoint Mapper Internal Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Endpoint Mapper Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Endpoint Mapper database contents'}
+		$bc->{'sgos_sysinfo_sect'}{'FTP Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Forwarding Settings'}
+		$bc->{'sgos_sysinfo_sect'}{'Forwarding Statistics Per IP'}
+		$bc->{'sgos_sysinfo_sect'}{'Forwarding Summary Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Forwarding health check settings'}
+		$bc->{'sgos_sysinfo_sect'}{'Forwarding health check statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'HTTP Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'HTTP Main'}
+		$bc->{'sgos_sysinfo_sect'}{'HTTP Requests'}
+		$bc->{'sgos_sysinfo_sect'}{'HTTP Responses'}
+		$bc->{'sgos_sysinfo_sect'}{'Hardware Information'}
+		$bc->{'sgos_sysinfo_sect'}{'Hardware sensors'}
+		$bc->{'sgos_sysinfo_sect'}{'Health Monitor'}
+		$bc->{'sgos_sysinfo_sect'}{'Health check entries'}
+		$bc->{'sgos_sysinfo_sect'}{'Health check statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'ICP Hosts'}
+		$bc->{'sgos_sysinfo_sect'}{'ICP Settings'}
+		$bc->{'sgos_sysinfo_sect'}{'ICP Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'IM Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'Kernel Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Licensing Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'MAPI Client Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'MAPI Conversation Client Errors'}
+		$bc->{'sgos_sysinfo_sect'}{'MAPI Conversation Other Errors'}
+		$bc->{'sgos_sysinfo_sect'}{'MAPI Conversation Server Errors'}
+		$bc->{'sgos_sysinfo_sect'}{'MAPI Errors'}
+		$bc->{'sgos_sysinfo_sect'}{'MAPI Internal Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'MAPI Server Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'MAPI Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'MMS Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'MMS General'}
+		$bc->{'sgos_sysinfo_sect'}{'MMS Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'MMS Streaming Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'MSN IM Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'OPP Services'}
+		$bc->{'sgos_sysinfo_sect'}{'OPP Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'P2P Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Persistent Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Policy Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Policy'}
+		$bc->{'sgos_sysinfo_sect'}{'Priority 1 Events'}
+		$bc->{'sgos_sysinfo_sect'}{'Quicktime Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'Quicktime Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'RIP Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Real Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'Real Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Refresh Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'SCSI Disk Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'SOCKS Gateways Settings'}
+		$bc->{'sgos_sysinfo_sect'}{'SOCKS Gateways Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'SOCKS Proxy Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'SSL Proxy Certificate Cache'}
+		$bc->{'sgos_sysinfo_sect'}{'SSL Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Security processor Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Server Side persistent connections'}
+		$bc->{'sgos_sysinfo_sect'}{'Services Management Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Services Per-service Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Services Proxy Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Software Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'System Memory Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'TCP/IP ARP Information'}
+		$bc->{'sgos_sysinfo_sect'}{'TCP/IP Listening list'}
+		$bc->{'sgos_sysinfo_sect'}{'TCP/IP Malloc Information'}
+		$bc->{'sgos_sysinfo_sect'}{'TCP/IP Routing Table'}
+		$bc->{'sgos_sysinfo_sect'}{'TCP/IP Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Threshold Monitor Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Version Information'}
+		$bc->{'sgos_sysinfo_sect'}{'WCCP Configuration'}
+		$bc->{'sgos_sysinfo_sect'}{'WCCP Statistics'}
+		$bc->{'sgos_sysinfo_sect'}{'Yahoo IM Statistics'}
+		
 
 	The details for interface 0:0 are stored here:
 		IP address:   $bc->{'interface'}{'0:0'}{'ip'} 
@@ -675,7 +868,6 @@ Other data that is directly accessible in the object:
 
 
 =cut
-
 
 =head1 AUTHOR
 

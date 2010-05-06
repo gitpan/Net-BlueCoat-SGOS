@@ -7,6 +7,10 @@
 5.3.1.4;ssl-accelerator;none
 5.3.1.4;sysinfotime;Sat Mar 7, 2009 16:57:30 GMT
 5.3.1.4;ip-default-gateway;172.16.1.1
+5.3.1.4;sysinfo_type;sysinfo
+5.3.1.4;length-vpm-xml;9558
+5.3.1.4;length-vpm-cpl;3526
+5.3.1.4;length-static-bypass;0
 5.3.1.4;int-0:0-mac;00:d0:83:04:ae:fc
 5.3.1.4;int-0:0-capabilities;10/100
 5.3.1.4;int-0:0-linkstatus;no link
@@ -17,3 +21,4 @@
 5.3.1.4;int-0:1-linkstatus;100 Mbps full duplex
 5.3.1.4;int-0:1-ip;172.16.1.15
 5.3.1.4;int-0:1-netmask;255.255.255.0
+

@@ -11,3 +11,14 @@ Revision history for Net-BlueCoat-SGOS
 
 0.90	05-02-2010 1300
 		Minor fixes, speeling [sic] errors, more documentation
+
+0.91	05-05-2010 2255
+		Much better parsing of VPM-CPL and VPM-XML files.
+		Addition of vpmcpl() and vpmxml() methods to return respective
+			data.
+		Update documentation, particularly around the sections that can
+			retrieved directly (e.g. "Licensing Statistics" and many
+			others).
+		Better unit testing.
+		Updated example script now includes date/time of the sysinfo.
+

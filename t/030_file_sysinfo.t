@@ -4,7 +4,7 @@
 use strict;
 use Net::BlueCoat::SGOS;
 use Test::More;
-use Data::Dumper;
+no warnings;
 
 BEGIN { chdir 't' if -d 't' }
 
@@ -22,13 +22,11 @@ foreach my $file (@files) {
 			my $line = $_;
 			chomp($line);
 			my @s = split(/;/, $line);
-			if ($#s < 2) { next }
+			if ($#s < 1) { next }
 			if ($osregex) {
 				if ($s[0] !~ /$osregex/) { next }
 			}
-			if ($s[0] && $s[1] && $s[2]) {
-				$testparams{$s[0]}{$s[1]} = $s[2];
-			}
+			$testparams{$s[0]}{$s[1]} = $s[2];
 		}
 		close F;
 	}
@@ -40,7 +38,6 @@ foreach (keys %testparams) {
 	my %data        = %{$testparams{$sgosversion}};
 	$totaltests = $totaltests + 3;
 	$totaltests = $totaltests + (keys %data);
-	print "totaltests=$totaltests\n";
 }
 
 plan tests => $totaltests;
@@ -60,8 +57,6 @@ foreach (keys %testparams) {
 	# test 3 - is the size of the sysinfo greater than 10
 	ok(length($bc->{'_sgos_sysinfo'}) > 10, 'sysinfo size gt 10');
 
-	#print "Dumper bc=" . Dumper($bc);
-
 	foreach (sort keys %data) {
 		my $k     = $_;
 		my $value = $data{$k};
@@ -69,7 +64,12 @@ foreach (keys %testparams) {
 		if ($k =~ m/int-/) {
 			my ($interface, $configitem) = $k =~ m/int-(.+)-(.+)/;
 			ok($bc->{'interface'}{$interface}{$configitem} eq $value,
-				"expected ($value), got ($bc->{'interface'}{$interface}{$configitem})");
+				"expected $interface $configitem ($value), got ($bc->{'interface'}{$interface}{$configitem})");
+		}
+		elsif ($k =~ m/length-/) {
+			my ($var) = $k =~ m/length-(.+)/;
+			my $length = length($bc->{$var});
+			ok($length == $value, "length($var), expected ($value), got ($length)");
 		}
 		else {
 			ok($bc->{$k} eq $value, "$k: expected ($value), got ($bc->{$k})");

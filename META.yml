@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Net-BlueCoat-SGOS
-version:            0.90
+version:            0.91
 abstract:           A module to interact with Blue Coat SGOS-based devices.
 author:
     - Matthew Lange <mmlange@cpan.org>
